@@ -1,0 +1,513 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Alex Oprea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=VT323&display=swap">
+<style>
+/* Layout: one phosphor CRT screen — status bar, scrollback, live prompt, clickable command chips for non-typists.
+   Single-theme by choice (a terminal is dark). */
+:root{
+  color-scheme: dark;
+  --screen:#07100b;      /* phosphor-tube black, green-biased */
+  --bezel:#030805;
+  --fg:#8ff0a4;          /* P1 phosphor green */
+  --bright:#d2ffdc;      /* hot pixels: headings, prompt input */
+  --dim:#4f8a5e;         /* secondary text, dates */
+  --rule:#173a24;
+  --ice:#9fd8e8;         /* Ganymede ice — links & accents only */
+  --font-display:"VT323", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --step-0:clamp(14px, 0.85rem + 0.15vw, 15.5px);
+  --step-1:clamp(15px, 0.95rem + 0.2vw, 17px);
+}
+html,body{height:100%}
+body{background:var(--bezel);color:var(--fg);font-family:var(--font-mono);font-size:var(--step-0);line-height:1.6;margin:0}
+.crt{
+  box-sizing:border-box;min-height:100%;max-width:1240px;margin:0 auto;
+  padding-inline:16px;padding-block:20px 32px;
+  background:var(--screen);
+  position:relative;
+}
+@media (min-width:720px){.crt{padding-inline:40px}}
+/* pixel starfield drifting down behind everything */
+#stars{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;image-rendering:pixelated}
+.crt > :not(#stars){position:relative;z-index:1}
+/* faint scanlines + vignette */
+.crt::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
+  background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);}
+.crt::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);}
+.glow{text-shadow:0 0 6px rgba(143,240,164,.35)}
+
+.status{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;
+  color:var(--dim);font-size:12.5px;letter-spacing:.04em;border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:18px;
+  font-variant-numeric:tabular-nums}
+.status b{color:var(--fg);font-weight:400}
+
+.banner{font-family:var(--font-display);color:var(--bright);font-size:clamp(46px, 9vw, 84px);line-height:.9;margin:0 0 4px;
+  letter-spacing:.02em;text-shadow:0 0 14px rgba(143,240,164,.45)}
+.tag{color:var(--dim);margin:0 0 18px}
+
+#out{display:flex;flex-direction:column;gap:14px}
+.block{min-width:0}
+.echo{color:var(--dim)}
+.echo .cmd{color:var(--bright)}
+.ps{color:var(--fg)}
+.ps .host{color:var(--ice)}
+h2{font-family:var(--font-display);font-weight:400;color:var(--bright);font-size:30px;line-height:1;margin:6px 0 8px;letter-spacing:.03em}
+h3{font-size:var(--step-1);font-weight:600;color:var(--bright);margin:0}
+p{margin:0 0 10px;max-width:68ch}
+a{color:var(--ice);text-decoration:underline;text-decoration-color:rgba(159,216,232,.4);text-underline-offset:3px}
+a:hover{text-decoration-color:var(--ice)}
+.muted{color:var(--dim)}
+.todo{color:#e8d48f;font-style:italic}
+
+/* CV rows: date gutter + entry */
+.rows{display:grid;gap:12px;margin:4px 0 12px}
+.row{display:grid;grid-template-columns:15ch 1fr;gap:4px 18px}
+.row .when{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row > div{min-width:0}
+@media (max-width:560px){.row{grid-template-columns:1fr}.row .when{font-size:12.5px}}
+
+.skills{display:grid;grid-template-columns:12ch 1fr;gap:2px 18px;margin:0}
+.skills dt{color:var(--dim)}
+.skills dd{margin:0;min-width:0}
+@media (max-width:560px){.skills{grid-template-columns:1fr}.skills dd{margin-bottom:6px}}
+
+.proj{border-left:1px dashed var(--rule);padding-left:14px;margin:0 0 14px}
+.proj .meta{color:var(--dim);font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;margin:2px 0 6px}
+.stack{color:var(--ice);font-size:13px}
+
+.help{display:grid;grid-template-columns:11ch 1fr;gap:2px 16px}
+.help span:nth-child(odd){color:var(--bright)}
+
+/* two columns on wide screens: terminal left, sticky planet right */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:8px 48px}
+.term{min-width:0;grid-row:2}
+.planet{grid-row:1;justify-self:center;margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+#globe{width:200px;aspect-ratio:1;max-width:100%;display:block}
+.planet figcaption{color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase;text-align:center;font-variant-numeric:tabular-nums}
+@media (min-width:920px){
+  .layout{grid-template-columns:minmax(0,1fr) minmax(300px,400px)}
+  .term{grid-row:1}
+  .planet{grid-column:2;align-self:start;position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px)}
+  #globe{width:100%}
+}
+
+/* messenger-style profile card in whoami */
+.profile{display:flex;flex-wrap:wrap;gap:18px 24px;align-items:flex-start}
+.profile .text{flex:1 1 320px;min-width:0}
+.card{flex:0 0 auto;border:1px solid var(--rule);padding:8px;display:flex;flex-direction:column;gap:6px;width:max-content}
+.avatar{width:160px;height:176px;display:block;image-rendering:pixelated}
+.card .handle{font-size:12.5px;color:var(--bright);display:flex;align-items:center;gap:6px}
+.card .dot{width:7px;height:7px;background:var(--fg);box-shadow:0 0 6px var(--fg)}
+.card .away{font-size:12px;color:var(--dim);max-width:160px;line-height:1.35}
+
+/* prompt */
+.prompt{display:flex;align-items:center;gap:8px;margin-top:16px}
+.prompt label{white-space:nowrap}
+#cmd{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--bright);
+  font:inherit;font-size:16px;caret-color:var(--fg);padding:2px 0}
+.prompt:focus-within{background:rgba(143,240,164,.04)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chips button{font:inherit;font-size:13px;color:var(--fg);background:transparent;border:1px solid var(--rule);
+  padding:3px 10px;cursor:pointer}
+.chips button:hover{border-color:var(--fg);color:var(--bright)}
+.chips button:focus-visible,#cmd:focus-visible{outline:1px solid var(--ice);outline-offset:2px}
+
+@media (prefers-reduced-motion:no-preference){
+  .block.new{animation:flick .18s ease-out}
+  @keyframes flick{from{opacity:.35;filter:brightness(1.8)}to{opacity:1;filter:none}}
+}
+</style>
+
+<div class="crt glow">
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="status" aria-hidden="true">
+    <span>tty1 · <b>ganymede-shell</b></span>
+    <span>R = 2634 km · T<sub>surf</sub> ≈ 110 K</span>
+    <span id="clock">--:--:-- CET</span>
+  </div>
+
+  <div class="layout">
+  <div class="term">
+  <h1 class="banner">ALEX OPREA</h1>
+  <p class="tag">planetary scientist in training · ice shells, craters, convection</p>
+
+  <main id="out" aria-live="polite"></main>
+
+  <form class="prompt" id="form" autocomplete="off">
+    <label for="cmd" class="ps"><span class="host">alex@ganymede</span>:~$</label>
+    <input id="cmd" type="text" spellcheck="false" autocapitalize="off" aria-label="Type a command, for example help">
+  </form>
+  <nav class="chips" aria-label="Quick commands">
+    <button type="button" data-cmd="whoami">whoami</button>
+    <button type="button" data-cmd="cv">cv</button>
+    <button type="button" data-cmd="projects">projects</button>
+    <button type="button" data-cmd="contact">contact</button>
+    <button type="button" data-cmd="help">help</button>
+    <button type="button" data-cmd="clear">clear</button>
+  </nav>
+  </div>
+  <figure class="planet">
+    <canvas id="globe" role="img" aria-label="Ganymede drawn in zeros and ones, slowly rotating"></canvas>
+    <figcaption>ganymede · rendered in binary<br>P<sub>rot</sub> = 7.155 d · tidally locked</figcaption>
+  </figure>
+  </div>
+</div>
+
+<script>
+const OUT = document.getElementById('out');
+const INPUT = document.getElementById('cmd');
+
+const COMMANDS = {
+  help: () => `
+    <h2>available commands</h2>
+    <div class="help">
+      <span>whoami</span><span>short bio</span>
+      <span>cv</span><span>education, experience, skills</span>
+      <span>projects</span><span>research and software projects</span>
+      <span>contact</span><span>where to find me</span>
+      <span>clear</span><span>wipe the screen</span>
+    </div>
+    <p class="muted" style="margin-top:8px">tab completes · ↑/↓ scroll history · or just click the buttons below</p>`,
+
+  whoami: () => `
+    <h2>whoami</h2>
+    <div class="profile">
+      <div class="card">
+        <canvas class="avatar" width="40" height="44" role="img" aria-label="Pixel portrait of Alex, blinking now and then"></canvas>
+        <div class="handle"><span class="dot" aria-hidden="true"></span>alex_oprea</div>
+        <div class="away">status: running sims, back in 5 min</div>
+      </div>
+      <div class="text">
+    <p>I'm Alex, a MSc student in Earth and Planetary Sciences at the University of Freiburg.</p>
+    <p>My current interest is on Ganymede: how its ice shell convects, how its subsurface is layered, and how its surface got resurfaced into the dark and light terrain we see today. Most of that work happens in numerical models, currently with the GAIA convection code at the DLR Institute of Planetary Research in Berlin.</p>
+    <p>Before planetary science I worked on marine geophysics, seawater chemistry and ocean data in Bremen and at Hereon. My backround is dynamic and my interests change consistently. I believe knowledge belongs to the people and I want to make it my mission to fight for open access science.</p>
+      </div>
+    </div>`,
+
+  cv: () => `
+    <h2>cv</h2>
+    <h3>research experience</h3>
+    <div class="rows">
+      <div class="row"><span class="when">08/2026–11/2026</span><div>
+        <strong>Research intern</strong> · DLR Institute of Planetary Research, Berlin<br>
+        <span class="muted">GAIA convection simulations of Ganymede's ice shell to study subsurface layering and resurfacing; reproducing published crater-based layer-thickness estimates.</span></div></div>
+      <div class="row"><span class="when">02/2026–06/2026</span><div>
+        <strong>Research assistant (HiWi)</strong> · University of Freiburg<br>
+        <span class="muted">Built an equation-of-state database with Prof. Clemens Prescher (FastAPI, PostgreSQL, Docker).</span></div></div>
+      <div class="row"><span class="when">05/2025–08/2025</span><div>
+        <strong>Guest researcher</strong> · Jacobs University, Bremen<br>
+        <span class="muted">Measured trace Cr(VI) in seawater by UV digestion and standard-addition voltammetry; maintained a Chelex resin purification setup.</span></div></div>
+      <div class="row"><span class="when">06/2023–08/2023</span><div>
+        <strong>Physical oceanography intern</strong> · Helmholtz-Zentrum Hereon, Geesthacht<br>
+        <span class="muted">Python tools to detect and characterise marine heatwave events in climate datasets.</span></div></div>
+    </div>
+    <h3>teaching</h3>
+    <div class="rows">
+      <div class="row"><span class="when">09/2023–02/2025</span><div>
+        <strong>Teaching assistant</strong> · Jacobs University, Bremen<br>
+        <span class="muted">Weekly Python tutorials on scientific computing, data analysis and geospatial processing. Supported remote sensing, marine geophysics and Earth-system modelling courses; taught sonar processing before North Sea fieldwork and wrote Sentinel-1 volcano-monitoring tutorials.</span></div></div>
+    </div>
+    <h3>education</h3>
+    <div class="rows">
+      <div class="row"><span class="when">–09/2027</span><div>
+        <strong>MSc Earth and Planetary Science</strong> · University of Freiburg<br>
+        <span class="muted">Planetary interiors, impact cratering and shock waves, space missions and instrumentation, geophysics, scientific computing.</span></div></div>
+      <div class="row"><span class="when">–12/2024</span><div>
+        <strong>BSc Earth and Environmental Sciences</strong> · Jacobs University (Constructor University), Bremen<br>
+        <span class="muted">GIS, geophysical remote sensing, marine geophysics, data science for Earth sciences.</span></div></div>
+      <div class="row"><span class="when">–07/2021</span><div>
+        <strong>Mathematics and Computer Science</strong> · Tudor Vianu National College of Computer Science, Bucharest<br>
+        <span class="muted">FIRST Tech Challenge robotics: SolidWorks design and Java autonomous programming.</span></div></div>
+    </div>
+    <h3>skills</h3>
+    <dl class="skills">
+      <dt>geophysics</dt><dd>GAIA, pyshtools</dd>
+      <dt>python</dt><dd>NumPy, SciPy, pandas, xarray, matplotlib, Astropy</dd>
+      <dt>software</dt><dd>FastAPI, PostgreSQL, Docker, Git, Linux, LaTeX</dd>
+      <dt>geospatial</dt><dd>QGIS, satellite image processing, side-scan sonar</dd>
+      <dt>lab</dt><dd>voltammetry, UV digestion</dd>
+      <dt>languages</dt><dd>Romanian (native), English (C2), German (B1)</dd>
+    </dl>
+    <p class="muted" style="margin-top:12px">full CV: <a href="cv.pdf" target="_blank" rel="noopener">cv.pdf</a></p>`,
+
+  projects: () => `
+    <h2>projects</h2>
+    <div class="proj">
+      <h3>Convection in Ganymede's ice shell</h3>
+      <div class="meta">DLR Berlin · 2026 · ongoing</div>
+      <p>Numerical simulations with GAIA to find when Ganymede's ice shell convects and how its stagnant lid scales with ice grain size. The grain-size sweep sets up the benchmarks for modelling subsurface layering and resurfacing.</p>
+      <div class="stack">GAIA · Python · ParaView</div>
+    </div>
+    <div class="proj">
+      <h3>Equation-of-state database</h3>
+      <div class="meta">University of Freiburg · 2026</div>
+      <p>A database and web API for equation-of-state data for planetary materials, so the parameters behind interior models are searchable and reproducible.</p>
+      <div class="stack">FastAPI · PostgreSQL · Docker</div>
+    </div>
+    <div class="proj">
+      <h3>Gravity of the terrestrial planets</h3>
+      <div class="meta">University of Freiburg · 2026</div>
+      <p>A spherical-harmonic pipeline comparing the gravity fields of Earth, Venus and Mars: geoid, free-air and Bouguer anomalies, and gravity–topography admittance. Most of the work was in getting the conventions right across three very different bodies, from reference ellipsoids and longitude conventions to handling planets without a sea level. This was for one of my courses.</p>
+      <div class="stack">Python · pyshtools · NumPy · matplotlib</div>
+    </div>
+    <div class="proj">
+      <h3>Reproducing the SDSS DR7 quasar catalog</h3>
+      <div class="meta">University of Freiburg · 2026</div>
+      <p>A replication of the statistical properties in Shen et al. (2011) for ~105,000 quasars: line widths, equivalent widths, continuum luminosities and black hole mass estimates. I worked out the original binning and quality cuts in correspondence with the lead author, and documented where the public catalog has quirks of its own, such as spectral slopes quantised to 0.1.</p>
+      <div class="stack">Python · Astropy · pandas · SciPy</div>
+    </div>
+    <div class="proj">
+      <h3>Automated crater detection</h3>
+      <div class="meta">coursework / side project</div>
+      <p>A machine-learning pipeline that picks out impact craters from planetary imagery and terrain data (for another class). I attempted screening Australia's Gawler Craton with gravity, magnetics and DEMs. I manage to detect Acraman as a validation and other circular features. I haven't optimized it nor pursued this further; as I was told that it's a "Phd topic". I know it was a bit overkill, but maybe one day I will try optimizing it if interest resurfaces (pun intended). </p>
+      <div class="stack">Python · Random Forest · XGBoost</div>
+    </div>
+    <div class="proj">
+      <h3>Marine heatwave detection</h3>
+      <div class="meta">Helmholtz-Zentrum Hereon · 2023</div>
+      <p>BSc Thesis project. I have built scripts that detect and characterize marine heatwave events on the SE coast of Brazil in the past 25 years.</p>
+      <div class="stack">Python · xarray</div>
+    </div>
+    <p class="muted">code: <a href="https://github.com/TheWarid0" target="_blank" rel="noopener">github.com/TheWarid0</a></p>`,
+
+  contact: () => `
+    <h2>contact</h2>
+    <dl class="skills">
+      <dt>github</dt><dd><a href="https://github.com/TheWarid0" target="_blank" rel="noopener">TheWarid0</a></dd>
+      <dt>email</dt><dd>alexceloprea [at] gmail [dot] com</dd>
+      <dt>orcid</dt><dd class="todo">0000-0000-0000-0000</dd>
+      <dt>based in</dt><dd>Freiburg / Berlin, Germany</dd>
+    </dl>`,
+
+  ls: () => `<p>whoami&nbsp;&nbsp;cv&nbsp;&nbsp;projects&nbsp;&nbsp;contact</p>`,
+  sudo: () => `<p>alex is not in the sudoers file. This incident will be reported to the Galilean moons.</p>`,
+  date: () => `<p>${new Date().toString()}</p>`,
+};
+const ALIASES = {bio:'whoami', about:'whoami', resume:'cv', 'cat':'cv', work:'projects', '?':'help'};
+
+// ---- pixel avatar: hand-drawn 40x44 frames, resolves from noise, then blinks ----
+const AV_W = 40, AV_H = 44;
+const AV_FRAMES = {"open": ".............................................................................................................................................................................ddddd..ddddd..........................ddddHHdddddddddd.......................ddddHddHdddddddHHd...................dddHHddddddddddddHdddddd..............ddddHddddddddHHdddHddddddddd............dddHddddddddHddHddddHHdddddd.............dddddHHdddddddddddHddHdddd..............ddddHdddHHdddHHddddddHdddd............dddddHdddHddddHddHdddddddHHdd...........dddHddddHddddHddddHdddddHddHdd.........dddHHddddddHHdddddddddddddddHdd.........ddHddddddHHHHHHddddHHdddddddd...........ddddddddHHHHHHHHHHHHHHHddddd............dddddddHHHHHHHHHHHHHHHHHHddd............ddddddHHKKKKHHHHHHKKKKHHHddd............ddHHHdHHHHHHHHHHHHHHHHHHHHd.............dHHHHdHHKKKKHHHHHHKKKKHHHHHK............dHKHHHHHKBKKHHHHHHKBKKHHHHHK............dHKHHHHHHKKHHHHHHHHKKHHHHHHK............dHHKHHHHHHHHHHHKHHHHHHHHHHHK.............dHHHHHHHHHHHHHKHHHHHHHHHHHK..............HHHHHHHHHHHHHKHHHHHHHHHHHK...............HHHHHHHHHHKKKHHHHHHHHHHHK...............HHHHHHHddddddddddHHHHHHK.................HHHHHddddddddddddHHHHH..................HHHHHdHHHHHHHHKHdHHHHK...................HHHHHHHKKKKKKHHHHHHHK...................HHHHHHHHHHHHHHHHHHHHK....................HHHHHHHHHHHHHHHHHHK......................HHHHHHHHHHHHHHHHK........................HHHHHHHHHHHHHHK..........................HHHHHHHHHHHK.............................HKKKKKKKKK............................dHHHKKKKKKHd..........................dddKHHHKKKKHdddK......................ddHHHKKHHHHHHKHHHKdd...................KddHHHKdKHHHHKdHHHKddH.................KKKKKKKKKKKKKKKKKKKKKKKK...............ddKHHdddKHHdddKHHdddKHHddd.............dddKHHdddKHHdddKHHdddKHHdddK.........", "half": ".............................................................................................................................................................................ddddd..ddddd..........................ddddHHdddddddddd.......................ddddHddHdddddddHHd...................dddHHddddddddddddHdddddd..............ddddHddddddddHHdddHddddddddd............dddHddddddddHddHddddHHdddddd.............dddddHHdddddddddddHddHdddd..............ddddHdddHHdddHHddddddHdddd............dddddHdddHddddHddHdddddddHHdd...........dddHddddHddddHddddHdddddHddHdd.........dddHHddddddHHdddddddddddddddHdd.........ddHddddddHHHHHHddddHHdddddddd...........ddddddddHHHHHHHHHHHHHHHddddd............dddddddHHHHHHHHHHHHHHHHHHddd............ddddddHHKKKKHHHHHHKKKKHHHddd............ddHHHdHHHHHHHHHHHHHHHHHHHHd.............dHHHHdHHHHHHHHHHHHHHHHHHHHHK............dHKHHHHHKKKKHHHHHHKKKKHHHHHK............dHKHHHHHHKKHHHHHHHHKKHHHHHHK............dHHKHHHHHHHHHHHKHHHHHHHHHHHK.............dHHHHHHHHHHHHHKHHHHHHHHHHHK..............HHHHHHHHHHHHHKHHHHHHHHHHHK...............HHHHHHHHHHKKKHHHHHHHHHHHK...............HHHHHHHddddddddddHHHHHHK.................HHHHHddddddddddddHHHHH..................HHHHHdHHHHHHHHKHdHHHHK...................HHHHHHHKKKKKKHHHHHHHK...................HHHHHHHHHHHHHHHHHHHHK....................HHHHHHHHHHHHHHHHHHK......................HHHHHHHHHHHHHHHHK........................HHHHHHHHHHHHHHK..........................HHHHHHHHHHHK.............................HKKKKKKKKK............................dHHHKKKKKKHd..........................dddKHHHKKKKHdddK......................ddHHHKKHHHHHHKHHHKdd...................KddHHHKdKHHHHKdHHHKddH.................KKKKKKKKKKKKKKKKKKKKKKKK...............ddKHHdddKHHdddKHHdddKHHddd.............dddKHHdddKHHdddKHHdddKHHdddK.........", "shut": ".............................................................................................................................................................................ddddd..ddddd..........................ddddHHdddddddddd.......................ddddHddHdddddddHHd...................dddHHddddddddddddHdddddd..............ddddHddddddddHHdddHddddddddd............dddHddddddddHddHddddHHdddddd.............dddddHHdddddddddddHddHdddd..............ddddHdddHHdddHHddddddHdddd............dddddHdddHddddHddHdddddddHHdd...........dddHddddHddddHddddHdddddHddHdd.........dddHHddddddHHdddddddddddddddHdd.........ddHddddddHHHHHHddddHHdddddddd...........ddddddddHHHHHHHHHHHHHHHddddd............dddddddHHHHHHHHHHHHHHHHHHddd............ddddddHHKKKKHHHHHHKKKKHHHddd............ddHHHdHHHHHHHHHHHHHHHHHHHHd.............dHHHHdHHHHHHHHHHHHHHHHHHHHHK............dHKHHHHHKKKKHHHHHHKKKKHHHHHK............dHKHHHHHHHHHHHHHHHHHHHHHHHHK............dHHKHHHHHHHHHHHKHHHHHHHHHHHK.............dHHHHHHHHHHHHHKHHHHHHHHHHHK..............HHHHHHHHHHHHHKHHHHHHHHHHHK...............HHHHHHHHHHKKKHHHHHHHHHHHK...............HHHHHHHddddddddddHHHHHHK.................HHHHHddddddddddddHHHHH..................HHHHHdHHHHHHHHKHdHHHHK...................HHHHHHHKKKKKKHHHHHHHK...................HHHHHHHHHHHHHHHHHHHHK....................HHHHHHHHHHHHHHHHHHK......................HHHHHHHHHHHHHHHHK........................HHHHHHHHHHHHHHK..........................HHHHHHHHHHHK.............................HKKKKKKKKK............................dHHHKKKKKKHd..........................dddKHHHKKKKHdddK......................ddHHHKKHHHHHHKHHHKdd...................KddHHHKdKHHHHKdHHHKddH.................KKKKKKKKKKKKKKKKKKKKKKKK...............ddKHHdddKHHdddKHHdddKHHddd.............dddKHHdddKHHdddKHHdddKHHdddK........."};
+const AV_TONE = { '.':'--screen', K:'--screen', d:'--dim', M:'--dim', H:'--fg', S:'--fg', B:'--bright' };
+function paintAvatar(cv){
+  const ctx = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const rgb = v => { const c = css.getPropertyValue(v).trim(); return [1,3,5].map(i => parseInt(c.slice(i,i+2),16)); };
+  const COL = {}; for (const k in AV_TONE) COL[k] = rgb(AV_TONE[k]);
+  const NOISE = [COL['.'], COL.d, COL.H];
+  const img = ctx.createImageData(AV_W, AV_H);
+  const draw = (frame, mask) => {
+    for (let i = 0; i < AV_W*AV_H; i++){
+      const c = (!mask || mask[i]) ? COL[frame[i]] : NOISE[(Math.random()*3)|0];
+      img.data.set([c[0],c[1],c[2],255], i*4);
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still){ draw(AV_FRAMES.open); return; }
+  const settled = new Uint8Array(AV_W*AV_H); let f = 0;
+  (function resolve(){
+    f++; const p = Math.min(1, f/30) * 0.3;
+    for (let i = 0; i < settled.length; i++) if (!settled[i] && Math.random() < p) settled[i] = 1;
+    draw(AV_FRAMES.open, f < 45 ? settled : null);
+    if (f < 45) requestAnimationFrame(resolve); else blinkLoop();
+  })();
+  function blinkLoop(){
+    const seq = Math.random() < 0.2
+      ? [['half',50],['shut',90],['half',50],['open',140],['half',50],['shut',90],['half',50],['open',0]]
+      : [['half',55],['shut',100],['half',55],['open',0]];
+    let i = 0;
+    setTimeout(function step(){
+      if (!cv.isConnected) return;               // card was cleared from the screen
+      const [name, ms] = seq[i++]; draw(AV_FRAMES[name]);
+      if (i < seq.length) setTimeout(step, ms); else blinkLoop();
+    }, 2500 + Math.random()*3500);
+  }
+}
+
+const history = []; let hIdx = 0;
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function print(cmd, html, animate=true){
+  const b = document.createElement('section');
+  b.className = 'block' + (animate ? ' new' : '');
+  b.innerHTML = `<div class="echo"><span class="ps"><span class="host">alex@ganymede</span>:~$</span> <span class="cmd">${esc(cmd)}</span></div>` + html;
+  OUT.appendChild(b);
+  b.querySelectorAll('canvas.avatar').forEach(cv => paintAvatar(cv));
+}
+
+function run(raw, animate=true){
+  const cmd = raw.trim();
+  if(!cmd) return;
+  history.push(cmd); hIdx = history.length;
+  const word = cmd.split(/\s+/)[0].toLowerCase();
+  const name = ALIASES[word] || word;
+  if(name === 'clear'){ OUT.innerHTML = ''; return; }
+  const fn = COMMANDS[name];
+  print(cmd, fn ? fn() : `<p>command not found: ${esc(word)}. Try <span style="color:var(--bright)">help</span>.</p>`, animate);
+  if(animate) INPUT.scrollIntoView({block:'end', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+}
+
+document.getElementById('form').addEventListener('submit', e => { e.preventDefault(); run(INPUT.value); INPUT.value=''; });
+document.querySelectorAll('.chips button').forEach(b => b.addEventListener('click', () => { run(b.dataset.cmd); INPUT.focus({preventScroll:true}); }));
+
+INPUT.addEventListener('keydown', e => {
+  if(e.key === 'ArrowUp'){ if(hIdx>0){ hIdx--; INPUT.value = history[hIdx]; } e.preventDefault(); }
+  else if(e.key === 'ArrowDown'){ if(hIdx<history.length-1){ hIdx++; INPUT.value = history[hIdx]; } else { hIdx = history.length; INPUT.value=''; } e.preventDefault(); }
+  else if(e.key === 'Tab'){
+    const v = INPUT.value.trim().toLowerCase(); if(!v) return;
+    const hit = Object.keys(COMMANDS).concat('clear').find(k => k.startsWith(v));
+    if(hit){ INPUT.value = hit; e.preventDefault(); }
+  }
+});
+// clicking anywhere on the screen focuses the prompt (unless selecting text or clicking a link)
+document.querySelector('.crt').addEventListener('click', e => {
+  if(e.target.closest('a,button,input') || String(getSelection())) return;
+  INPUT.focus({preventScroll:true});
+});
+
+function tick(){
+  const t = new Date().toLocaleTimeString('de-DE', {timeZone:'Europe/Berlin', hour12:false});
+  document.getElementById('clock').textContent = t + ' Berlin';
+}
+tick(); setInterval(tick, 1000);
+
+
+// ---- binary Ganymede ----
+(() => {
+  const cv = document.getElementById('globe');
+  const ctx = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const C = { fg: css.getPropertyValue('--fg').trim(), bright: css.getPropertyValue('--bright').trim(),
+              dim: css.getPropertyValue('--dim').trim(), ice: css.getPropertyValue('--ice').trim() };
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  let W = 0, cell = 10, N = 0, rot = 0, last = 0;
+  const tilt = 0.32, L = norm([-0.55, 0.45, 0.7]);           // light from upper left
+  function norm(v){ const m = Math.hypot(...v); return v.map(x => x / m); }
+
+  // Seamless terrain: dark ancient terrain (like Galileo Regio) vs bright grooved terrain.
+  function terrain(lon, lat){
+    const f = Math.sin(2*lon + 1.3) * Math.cos(2.6*lat) + 0.55*Math.sin(5*lon - 2.1*lat + 0.7) + 0.3*Math.sin(9*lon + 4*lat);
+    const dark = f > 0.35;
+    const groove = 0.5 + 0.5*Math.sin(34*(lat + 0.25*Math.sin(3*lon + lat)));   // parallel groove lanes
+    return { dark, groove };
+  }
+  // Stable bit per surface patch, so digits travel with the rotation instead of flickering.
+  function bit(lon, lat){
+    const a = Math.floor((lon / (2*Math.PI)) * 96), b = Math.floor((lat + 1.6) * 30);
+    let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177;
+    return (h >>> 0) & 1 ? '1' : '0';
+  }
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; cv.width = W * dpr; cv.height = W * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cell = W < 260 ? 7 : 9;
+    N = Math.floor(W / cell);
+    ctx.font = `${cell + 1}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, W);
+    const r = N / 2 - 1, ct = Math.cos(tilt), st = Math.sin(tilt);
+    for (let j = 0; j < N; j++){
+      const y = (r - j) / r;
+      for (let i = 0; i < N; i++){
+        const x = (i - r) / r, d2 = x*x + y*y;
+        if (d2 > 1) continue;
+        const z = Math.sqrt(1 - d2);
+        const shade = x*L[0] + y*L[1] + z*L[2];
+        // undo axial tilt, then read surface coordinates
+        const yy = y*ct - z*st, zz = y*st + z*ct;
+        const lat = Math.asin(yy), lon = Math.atan2(x, zz) + rot;
+        const { dark, groove } = terrain(lon, lat);
+        let a = Math.max(0, shade);
+        if (dark) a *= 0.45; else a *= 0.65 + 0.35*groove;
+        const rim = d2 > 0.93;                                   // thin bright limb
+        if (a < 0.06 && !rim) continue;
+        ctx.globalAlpha = rim ? Math.max(a, 0.35) : 0.15 + 0.85*a;
+        ctx.fillStyle = rim ? C.ice : dark ? C.dim : (a > 0.7 ? C.bright : C.fg);
+        ctx.fillText(bit(((lon % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI), lat), i*cell + cell/2, j*cell + cell/2);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function loop(t){
+    if (t - last > 50){ rot += 0.006 * Math.min(3, (t - last) / 50); last = t; draw(); }
+    if (!still.matches) requestAnimationFrame(loop);
+  }
+  resize(); draw();
+  new ResizeObserver(() => { resize(); draw(); }).observe(cv);
+  if (!still.matches) requestAnimationFrame(loop);
+  still.addEventListener?.('change', () => { if (!still.matches) requestAnimationFrame(loop); });
+  document.fonts?.ready.then(() => { resize(); draw(); });
+})();
+
+// ---- pixel starfield: three parallax layers drifting slowly downward ----
+(() => {
+  const cv = document.getElementById('stars'), ctx = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const C = { dim: css.getPropertyValue('--dim').trim(), fg: css.getPropertyValue('--fg').trim(), bright: css.getPropertyValue('--bright').trim() };
+  const PX = 3;                                   // one star pixel = 3 css px
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  // shapes as pixel offsets
+  const DOT = [[0,0]], PLUS = [[0,0],[1,0],[-1,0],[0,1],[0,-1]],
+        SPARK = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]];
+  const LAYERS = [ {n:70, speed:1.2, col:'dim',   shapes:[DOT],        alpha:.55},
+                   {n:28, speed:2.6, col:'fg',    shapes:[DOT,DOT,PLUS], alpha:.45},
+                   {n:7,  speed:4.5, col:'bright',shapes:[PLUS,SPARK], alpha:.6} ];
+  let W, H, stars = [];
+  function seed(){
+    W = Math.ceil(innerWidth / PX); H = Math.ceil(innerHeight / PX);
+    cv.width = W; cv.height = H;
+    const area = (W*H) / (400*300);                 // keep density steady across screen sizes
+    stars = [];
+    LAYERS.forEach((L, li) => {
+      for (let i = 0; i < Math.round(L.n * area); i++)
+        stars.push({ x: Math.random()*W, y: Math.random()*H, L: li,
+                     s: L.shapes[(Math.random()*L.shapes.length)|0],
+                     tw: Math.random()*6.28, tws: .5 + Math.random()*1.5 });
+    });
+  }
+  function draw(t){
+    ctx.clearRect(0, 0, W, H);
+    for (const st of stars){
+      const L = LAYERS[st.L];
+      const flick = 0.65 + 0.35*Math.sin(st.tw + t/1000*st.tws);   // gentle twinkle
+      ctx.globalAlpha = L.alpha * flick;
+      ctx.fillStyle = C[L.col];
+      // sparkles shrink to a plus when dim, so they "glint"
+      const shape = (st.s === SPARK && flick < .8) ? PLUS : st.s;
+      const x = Math.round(st.x), y = Math.round(st.y);
+      for (const [dx,dy] of shape) ctx.fillRect(x+dx, y+dy, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+  let last = performance.now();
+  function loop(t){
+    const dt = Math.min(0.1, (t - last) / 1000); last = t;
+    for (const st of stars){
+      st.y += LAYERS[st.L].speed * dt;
+      if (st.y > H + 3){ st.y = -3; st.x = Math.random()*W; }
+    }
+    draw(t);
+    if (!still.matches) requestAnimationFrame(loop);
+  }
+  seed(); draw(0);
+  addEventListener('resize', () => { seed(); draw(performance.now()); });
+  if (!still.matches) requestAnimationFrame(loop);
+  still.addEventListener?.('change', () => { if (!still.matches){ last = performance.now(); requestAnimationFrame(loop); } });
+})();
+
+// first screen: bio is visible immediately, no waiting
+run('whoami', false);
+</script>
+
+</body></html>
